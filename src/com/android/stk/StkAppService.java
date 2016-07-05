@@ -615,7 +615,11 @@ public class StkAppService extends Service implements Runnable {
                 break;
             case OP_LOCALE_CHANGED:
                 CatLog.d(this, "Locale Changed");
-                checkForSetupEvent(LANGUAGE_SELECTION_EVENT,(Bundle) msg.obj, slotId);
+                for (int slot = 0; slot < mSimCount; slot++) {
+                    if (mStkContext[slot] != null) {
+                        checkForSetupEvent(LANGUAGE_SELECTION_EVENT,(Bundle) msg.obj, slot);
+                    }
+                }
                 break;
             case OP_ALPHA_NOTIFY:
                 handleAlphaNotify((Bundle) msg.obj);
@@ -937,6 +941,18 @@ public class StkAppService extends Service implements Runnable {
                 }
             } else {
                 CatLog.d(LOG_TAG, "install App");
+                CatLog.d(LOG_TAG, "getResources().getBoolean(R.bool.send_stk_title ="
+                        + (getResources().getBoolean(R.bool.send_stk_title)));
+                if ((getResources().getBoolean(R.bool.send_stk_title))) {
+                    String stkTitle = mStkContext[slotId].mCurrentMenu.title;
+                    CatLog.d(LOG_TAG ,"mCurrentMenu.title =" + stkTitle);
+                    //Send intent with the extra to launcher
+                    final String STK_INTENT =
+                            "org.codeaurora.carrier.ACTION_TELEPHONY_SEND_STK_TITLE";
+                    Intent intent = new Intent(STK_INTENT);
+                    intent.putExtra("StkTitle", stkTitle);
+                    sendStickyBroadcast(intent);
+                }
                 StkAppInstaller.install(mContext);
             }
             if (mStkContext[slotId].mMenuIsVisible) {
@@ -978,7 +994,7 @@ public class StkAppService extends Service implements Runnable {
             launchEventMessage(slotId);
             // Idle mode text needs to be cleared for init or reset modes of refresh
             if (cmdMsg.isRefreshResetOrInit()) {
-                mNotificationManager.cancel(STK_NOTIFICATION_ID);
+                mNotificationManager.cancel(getNotificationId(slotId));
                 mStkContext[slotId].mIdleModeTextCmd = null;
                 CatLog.d(this, "Clean idle mode text due to refresh");
             }
@@ -1713,6 +1729,7 @@ public class StkAppService extends Service implements Runnable {
 
         Message msg = mServiceHandler.obtainMessage();
         msg.arg1 = OP_STOP_TONE;
+        msg.arg2 = slotId;
         msg.obj = (Integer)(showUserInfo ? 1 : 0);
         msg.what = STOP_TONE_WHAT;
         mServiceHandler.sendMessageDelayed(msg, timeout);
